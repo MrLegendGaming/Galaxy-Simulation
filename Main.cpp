@@ -2,9 +2,12 @@
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "Shader.h"
 #include "Camera.h"
+#include "Sphere.h"
 
 // Variables
 unsigned int SCR_WIDTH = 1280;
@@ -57,8 +60,6 @@ int main()
 
 	// Defining a monitor
 	const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-	
-
 
 	// Centerring the window
 	glfwSetWindowPos(window, (mode->width - SCR_HEIGHT / 2) - (mode->width / 2), (mode->height - SCR_HEIGHT / 2) - (mode->height / 2));
@@ -67,7 +68,7 @@ int main()
 	glfwMakeContextCurrent(window);
 	// Changes viewport to fit the screen width
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-	
+
 	// Loads GLAD so we can use OpenGL and check for errors if it fails
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
 	{
@@ -91,7 +92,7 @@ int main()
 	glBindVertexArray(VAO);
 
 	// Creates the sphere models for drawing
-
+	Sphere star(5.0f);
 
 	// Trasnformations
 	unsigned int transformLoc = glGetUniformLocation(ourShader.ID, "transform");
@@ -110,9 +111,9 @@ int main()
 		float currentFrame = static_cast<float>(time);
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
-		
+
 		frameCount++;
-		
+
 		if (currentFrame - previousTime >= 1.0)
 		{
 			std::cout << "FPS: " << frameCount << std::endl;
@@ -124,7 +125,7 @@ int main()
 
 		// Render
 		glClearColor(0.0f, 0.0f, 0.1f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		ourShader.use();
 
@@ -133,16 +134,24 @@ int main()
 		glm::mat4 view = glm::mat4(1.0f);
 
 		// Look at function (cameraPos, cameraTarget, worldUp)
+		view = camera.GetViewMatrix();
+		projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 10000.0f);
+
 		int viewLoc = glGetUniformLocation(ourShader.ID, "view");
 		int projectionLoc = glGetUniformLocation(ourShader.ID, "projection");
 
 		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view[0][0]);
-		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(projection));
+		glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
 
 		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(0.0f));
 
+		glUniform3f(glGetUniformLocation(ourShader.ID, "color"), 1.0f, 1.0f, 1.0f);
 
 		ourShader.setMat4("model", model);
+		star.draw();
+
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}

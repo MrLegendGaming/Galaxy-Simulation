@@ -13,6 +13,7 @@
 unsigned int SCR_WIDTH = 1280;
 unsigned int SCR_HEIGHT = 720;
 
+
 // GLFW Functions
 void processInput(GLFWwindow* window); // Function to process input
 void framebuffer_size_callback(GLFWwindow* window, int width, int height); // Function for establishing window size and resize detection and response
@@ -81,7 +82,8 @@ int main()
 
 	// Shaders
 	// Creates a vertex & fragment shader and attaches it to the source code for the shader then compiles it
-	Shader ourShader("default.vert", "default.frag");
+	Shader defaultShader("default.vert", "default.frag");
+	Shader bloomShader("bloom.vert", "bloom.frag");
 
 	// Vertex management
 	// Generates a Vertex Array Object & Sphere Objects and stores the vertices into them before sending them to the GPU
@@ -92,14 +94,16 @@ int main()
 	glBindVertexArray(VAO);
 
 	// Creates the sphere models for drawing
-	Sphere star(5.0f);
+	Sphere star(1.0f);
 
 	// Trasnformations
-	unsigned int transformLoc = glGetUniformLocation(ourShader.ID, "transform");
+	unsigned int transformLoc = glGetUniformLocation(defaultShader.ID, "transform");
 
 	// 3D Rendering
 	// Fixes the Z-Axis buffer layering when drawing 
 	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	float time;
 
@@ -117,6 +121,7 @@ int main()
 		if (currentFrame - previousTime >= 1.0)
 		{
 			std::cout << "FPS: " << frameCount << std::endl;
+			std::cout << "Time: " << time << std::endl;
 			frameCount = 0;
 			previousTime = currentFrame;
 		}
@@ -127,7 +132,7 @@ int main()
 		glClearColor(0.0f, 0.0f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		ourShader.use();
+		defaultShader.use();
 
 		// Creates the model, view & projection matrices
 		glm::mat4 projection = glm::mat4(1.0f);
@@ -137,20 +142,86 @@ int main()
 		view = camera.GetViewMatrix();
 		projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 10000.0f);
 
-		int viewLoc = glGetUniformLocation(ourShader.ID, "view");
-		int projectionLoc = glGetUniformLocation(ourShader.ID, "projection");
+		int viewLoc = glGetUniformLocation(defaultShader.ID, "view");
+		int projectionLoc = glGetUniformLocation(defaultShader.ID, "projection");
 
 		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view[0][0]);
 		glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
 
-		glm::mat4 model = glm::mat4(1.0f);
+		glm::mat4 model = glm::mat4(1.0f);      // identity
 		model = glm::translate(model, glm::vec3(0.0f));
 
-		glUniform3f(glGetUniformLocation(ourShader.ID, "color"), 1.0f, 1.0f, 1.0f);
+		// ----------------------------
+		// STEP 1: Compute sphere center + radius in screen space
+		// ----------------------------
 
-		ourShader.setMat4("model", model);
+		glm::vec3 sphereCenter = glm::vec3(0.0f, 0.0f, 0.0f);   // your sphere position
+		float sphereRadius = star.getRadius();                  // 1.0f in your Sphere.h
+
+		// Project center to NDC
+		glm::vec4 clipCenter = projection * view * glm::vec4(sphereCenter, 1.0f);
+		glm::vec3 ndcCenter = glm::vec3(clipCenter) / clipCenter.w;
+
+		// Convert to screen pixels
+		glm::vec2 centerScreen;
+		centerScreen.x = (ndcCenter.x * 0.5f + 0.5f) * SCR_WIDTH;
+		centerScreen.y = (ndcCenter.y * 0.5f + 0.5f) * SCR_HEIGHT;
+
+		// Project point on sphere surface ( +X direction )
+		glm::vec4 clipEdge = projection * view *
+			glm::vec4(sphereCenter + glm::vec3(sphereRadius, 0.0f, 0.0f), 1.0f);
+		glm::vec3 ndcEdge = glm::vec3(clipEdge) / clipEdge.w;
+
+		glm::vec2 edgeScreen;
+		edgeScreen.x = (ndcEdge.x * 0.5f + 0.5f) * SCR_WIDTH;
+		edgeScreen.y = (ndcEdge.y * 0.5f + 0.5f) * SCR_HEIGHT;
+
+		float sphereRadiusPx = glm::length(edgeScreen - centerScreen);
+
+		// How wide the glow band should be (relative to sphere radius in pixels)
+		float glowWidthPx = sphereRadiusPx * 0.40f;  // tweak 0.4 to 0.3 or 0.5
+
+
+
+
+		// solid core
+		defaultShader.use();
+		defaultShader.setMat4("view", view);
+		defaultShader.setMat4("projection", projection);
+		defaultShader.setMat4("model", model);
+		defaultShader.setVec3("color", glm::vec3(1.0f));   // white
 		star.draw();
+
+		// ---- Glow pass ----
+
+		// slightly bigger model for the halo
+		glm::mat4 glowModel = glm::scale(model, glm::vec3(1.8f)); // try 1.5–2.0f
+
+		// don’t write depth, and use additive-ish blending
+		glDepthMask(GL_FALSE);
+		glEnable(GL_BLEND);
+		// src alpha controls strength, but we add to existing color
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+
+		bloomShader.use();
+		bloomShader.setMat4("view", view);
+		bloomShader.setMat4("projection", projection);
+		bloomShader.setMat4("model", glowModel);
+
+		bloomShader.setVec3("color", glm::vec3(1.0f));
+		bloomShader.setFloat("glowStrength", 3.0f);
+
+		bloomShader.setVec2("centerScreen", centerScreen);
+		bloomShader.setFloat("sphereRadiusPx", sphereRadiusPx);
+		bloomShader.setFloat("glowWidthPx", glowWidthPx);
+
+
+		star.draw();
+
+		// restore state
+		glDepthMask(GL_TRUE);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -158,7 +229,7 @@ int main()
 
 	glBindVertexArray(0);
 	glDeleteVertexArrays(1, &VAO);
-	glDeleteShader(ourShader.ID);
+	glDeleteShader(defaultShader.ID);
 
 	glfwTerminate();
 	return 0;

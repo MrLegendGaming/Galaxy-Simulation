@@ -40,5 +40,11 @@
     <None Include="default.frag">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="bloom.frag">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="bloom.vert">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

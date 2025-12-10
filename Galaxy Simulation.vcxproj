@@ -137,6 +137,8 @@
     <ClInclude Include="Sphere.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="bloom.frag" />
+    <None Include="bloom.vert" />
     <None Include="default.frag" />
     <None Include="default.vert" />
   </ItemGroup>

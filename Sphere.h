@@ -14,11 +14,13 @@ public:
     std::vector<float> vertices;
     std::vector<GLuint> indices;
     GLuint vbo, ebo; // Vertex Buffer Object and Element Buffer Object
+    float r;
 
     Sphere(float radius) {
         generateVertices(radius);
         generateIndices();
         createBuffers();
+        r = radius;
     }
 
     ~Sphere() {
@@ -35,6 +37,10 @@ public:
         glDisableVertexAttribArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    }
+
+    float getRadius() const {
+        return r;
     }
 
 private:

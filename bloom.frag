@@ -26,10 +26,10 @@ void main()
 
     // how far outside the sphere edge we are: 0 at edge, 1 at outer border
     float d = (dist - inner) / (outer - inner);
-    d = clamp(d, 0.0, 1.0);
+    d = clamp(d, 0.0, 9000.0);
 
     // smooth falloff (0 at outer edge, 1 at sphere edge)
-    float falloff = exp(-2.0 * d * d);   // tweak 3.0 sharper/softer
+    float falloff = exp(-time * 0.1 * d * d);   // tweak 3.0 sharper/softer
 
     vec3 glow = color * glowStrength * falloff;
 

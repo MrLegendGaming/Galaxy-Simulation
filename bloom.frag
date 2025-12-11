@@ -11,6 +11,8 @@ uniform vec2  centerScreen;   // center of sphere in pixels
 uniform float sphereRadiusPx; // radius of the solid sphere on screen (pixels)
 uniform float glowWidthPx;    // thickness of glow band (pixels)
 
+uniform float time;
+
 void main()
 {
     // fragment position in screen space
@@ -27,7 +29,7 @@ void main()
     d = clamp(d, 0.0, 1.0);
 
     // smooth falloff (0 at outer edge, 1 at sphere edge)
-    float falloff = exp(-3.0 * d * d);   // tweak 3.0 sharper/softer
+    float falloff = exp(-2.0 * d * d);   // tweak 3.0 sharper/softer
 
     vec3 glow = color * glowStrength * falloff;
 

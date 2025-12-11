@@ -157,7 +157,7 @@ int main()
 		// ----------------------------
 
 		glm::vec3 sphereCenter = glm::vec3(0.0f, 0.0f, 0.0f);   // your sphere position
-		float sphereRadius = star.getRadius();                  // 1.0f in your Sphere.h
+		float sphereRadius = star.getRadius();              // 1.0f in your Sphere.h
 
 		// Project center to NDC
 		glm::vec4 clipCenter = projection * view * glm::vec4(sphereCenter, 1.0f);
@@ -168,22 +168,24 @@ int main()
 		centerScreen.x = (ndcCenter.x * 0.5f + 0.5f) * SCR_WIDTH;
 		centerScreen.y = (ndcCenter.y * 0.5f + 0.5f) * SCR_HEIGHT;
 
-		// Project point on sphere surface ( +X direction )
+		// *** use CAMERA RIGHT, not world +X ***
+		glm::vec3 cameraRight(view[0][0], view[1][0], view[2][0]); // first column of view = right vector
+		cameraRight = glm::normalize(cameraRight);
+
+		// Project a point on the sphere surface in camera-right direction
 		glm::vec4 clipEdge = projection * view *
-			glm::vec4(sphereCenter + glm::vec3(sphereRadius, 0.0f, 0.0f), 1.0f);
+			glm::vec4(sphereCenter + cameraRight * sphereRadius, 1.0f);
 		glm::vec3 ndcEdge = glm::vec3(clipEdge) / clipEdge.w;
 
 		glm::vec2 edgeScreen;
 		edgeScreen.x = (ndcEdge.x * 0.5f + 0.5f) * SCR_WIDTH;
 		edgeScreen.y = (ndcEdge.y * 0.5f + 0.5f) * SCR_HEIGHT;
 
+		// Radius of sphere on the screen, in pixels
 		float sphereRadiusPx = glm::length(edgeScreen - centerScreen);
 
-		// How wide the glow band should be (relative to sphere radius in pixels)
-		float glowWidthPx = sphereRadiusPx * 0.40f;  // tweak 0.4 to 0.3 or 0.5
-
-
-
+		// How wide the glow band should be (relative to radius in pixels)
+		float glowWidthPx = sphereRadiusPx * 0.4f;  // tweak 0.3–0.5 to taste
 
 		// solid core
 		defaultShader.use();
@@ -216,6 +218,7 @@ int main()
 		bloomShader.setFloat("sphereRadiusPx", sphereRadiusPx);
 		bloomShader.setFloat("glowWidthPx", glowWidthPx);
 
+		bloomShader.setFloat("time", time);
 
 		star.draw();
 

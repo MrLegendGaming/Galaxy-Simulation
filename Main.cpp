@@ -1,4 +1,3 @@
-
 #include <iostream>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -11,8 +10,8 @@
 #include "Sphere.h"
 
 // Variables
-unsigned int SCR_WIDTH = 800;
-unsigned int SCR_HEIGHT = 600;
+unsigned int SCR_WIDTH = 1280;
+unsigned int SCR_HEIGHT = 720;
 
 // GLFW Functions
 void processInput(GLFWwindow* window); // Function to process input
@@ -113,6 +112,10 @@ int main()
     }
 
     float time;
+    float distance;
+
+    glm::vec3 position[5];
+    glm::vec3 velocity[std::size(position)];
 
     // ----- Main Loop -----
     while (!glfwWindowShouldClose(window))
@@ -151,79 +154,74 @@ int main()
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view[0][0]);
         glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f)); // sphere at origin
+
 
         // ---- STEP 1: Compute sphere center + radius in screen space ----
-        glm::vec3 sphereCenter = glm::vec3(0.0f, 0.0f, 0.0f);
-        float sphereRadius = star.getRadius(); // 1.0f
-
-        // Project center to clip/NDC
-        glm::vec4 clipCenter = projection * view * glm::vec4(sphereCenter, 1.0f);
-        glm::vec3 ndcCenter = glm::vec3(clipCenter) / clipCenter.w;
-
-        // Convert to screen pixels
-        glm::vec2 centerScreen;
-        centerScreen.x = (ndcCenter.x * 0.5f + 0.5f) * SCR_WIDTH;
-        centerScreen.y = (ndcCenter.y * 0.5f + 0.5f) * SCR_HEIGHT;
-
-        // Camera right (first column of view matrix) for pixel radius estimate
-        glm::vec3 cameraRight(view[0][0], view[1][0], view[2][0]);
-        cameraRight = glm::normalize(cameraRight);
-
-        glm::vec4 clipEdge = projection * view *
-        glm::vec4(sphereCenter + cameraRight * sphereRadius, 1.0f);
-        glm::vec3 ndcEdge = glm::vec3(clipEdge) / clipEdge.w;
-
-        glm::vec2 edgeScreen;
-        edgeScreen.x = (ndcEdge.x * 0.5f + 0.5f) * SCR_WIDTH;
-        edgeScreen.y = (ndcEdge.y * 0.5f + 0.5f) * SCR_HEIGHT;
-
-        float sphereRadiusPx = glm::length(edgeScreen - centerScreen);
-        float glowWidthPx = sphereRadiusPx * 0.4f; // tweak to taste
-
-        // ---- Visibility gate: only draw glow when sphere is in front and in frustum ----
-        glm::vec3 viewCenter = glm::vec3(view * glm::vec4(sphereCenter, 1.0f));
-        bool inFrontOfCamera = (viewCenter.z < 0.0f);
-
-        bool ndcValid = (clipCenter.w > 0.0f) &&
-            (ndcCenter.x >= -1.0f && ndcCenter.x <= 1.0f) &&
-            (ndcCenter.y >= -1.0f && ndcCenter.y <= 1.0f) &&
-            (ndcCenter.z >= -1.0f && ndcCenter.z <= 1.0f);
-
-        bool drawGlow = inFrontOfCamera && ndcValid;
-
-        // ---- Solid core (regular sphere) ----
-        defaultShader.use();
-        defaultShader.setMat4("view", view);
-        defaultShader.setMat4("projection", projection);
-        defaultShader.setMat4("model", model);
-        defaultShader.setVec3("color", glm::vec3(1.0f)); // white
-        star.draw();
-
-        // ---- Screen-space glow pass ----
-        if (drawGlow)
+        for (unsigned int i = 0; i < std::size(position); i++)
         {
-            glDisable(GL_DEPTH_TEST);                // full-screen overlay; no depth clip
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE);       // additive blend
+            distance = i * star.getRadius() * 8;
+            position[i] = glm::vec3(distance * sin(time * i * 0.25), distance * cos(time * i*0.25), 0.0f);
+            glm::vec3 sphereCenter = glm::vec3(position[i]);
+            float sphereRadius = star.getRadius(); // 1.0f
 
-            glowScreenShader.use();
-            glowScreenShader.setVec3("color", glm::vec3(1.0f));       // white glow
-            glowScreenShader.setFloat("glowStrength", sin(time * 3.5)/4 + 2);          // intensity
-            glowScreenShader.setVec2("centerScreen", centerScreen);   // uniforms already computed
-            glowScreenShader.setFloat("sphereRadiusPx", sphereRadiusPx);
-            glowScreenShader.setFloat("glowWidthPx", glowWidthPx);
-            glowScreenShader.setFloat("time", time);
+            // Project center to clip/NDC
+            glm::vec4 clipCenter = projection * view * glm::vec4(sphereCenter, 1.0f);
+            glm::vec3 ndcCenter = glm::vec3(clipCenter) / clipCenter.w;
 
-            glBindVertexArray(fsVAO);
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-            glBindVertexArray(0);
+            // Convert to screen pixels
+            glm::vec2 centerScreen;
+            centerScreen.x = (ndcCenter.x * 0.5f + 0.5f) * SCR_WIDTH;
+            centerScreen.y = (ndcCenter.y * 0.5f + 0.5f) * SCR_HEIGHT;
 
-            // restore
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            glDisable(GL_BLEND);
-            glEnable(GL_DEPTH_TEST);
+            // Camera right (first column of view matrix) for pixel radius estimate
+            glm::vec3 cameraRight(view[0][0], view[1][0], view[2][0]);
+            cameraRight = glm::normalize(cameraRight);
+
+            glm::vec4 clipEdge = projection * view *
+                glm::vec4(sphereCenter + cameraRight * sphereRadius, 1.0f);
+            glm::vec3 ndcEdge = glm::vec3(clipEdge) / clipEdge.w;
+
+            glm::vec2 edgeScreen;
+            edgeScreen.x = (ndcEdge.x * 0.5f + 0.5f) * SCR_WIDTH;
+            edgeScreen.y = (ndcEdge.y * 0.5f + 0.5f) * SCR_HEIGHT;
+
+            float sphereRadiusPx = glm::length(edgeScreen - centerScreen);
+            float glowWidthPx = sphereRadiusPx * 0.4f; // tweak to taste
+
+            // ---- Visibility gate: only draw glow when sphere is in front and in frustum ----
+            glm::vec3 viewCenter = glm::vec3(view * glm::vec4(sphereCenter, 1.0f));
+            bool inFrontOfCamera = (viewCenter.z < 0.0f);
+
+            bool ndcValid = (clipCenter.w > 0.0f) &&
+                (ndcCenter.x >= -1.0f && ndcCenter.x <= 1.0f) &&
+                (ndcCenter.y >= -1.0f && ndcCenter.y <= 1.0f) &&
+                (ndcCenter.z >= -1.0f && ndcCenter.z <= 1.0f);
+
+            bool drawGlow = inFrontOfCamera && ndcValid;
+            // ---- Screen-space glow pass ----
+            if (drawGlow)
+            {
+                glDisable(GL_DEPTH_TEST);                // full-screen overlay; no depth clip
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE);       // additive blend
+
+                glowScreenShader.use();
+                glowScreenShader.setVec3("color", glm::vec3(1.0f));       // white glow
+                glowScreenShader.setFloat("glowStrength", sin(time * 3.5) / 4 + 2);          // intensity
+                glowScreenShader.setVec2("centerScreen", centerScreen);   // uniforms already computed
+                glowScreenShader.setFloat("sphereRadiusPx", sphereRadiusPx);
+                glowScreenShader.setFloat("glowWidthPx", glowWidthPx);
+                glowScreenShader.setFloat("time", time);
+
+                glBindVertexArray(fsVAO);
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                glBindVertexArray(0);
+
+                // restore
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                glDisable(GL_BLEND);
+                glEnable(GL_DEPTH_TEST);
+            }
         }
 
         glfwSwapBuffers(window);
@@ -308,4 +306,9 @@ void mouse_callback(GLFWwindow* window, double xPosIn, double yPosIn)
     lastY = yPos;
 
     camera.ProcessMouseMovement(xOffset, yOffset);
+}
+
+void updatePosition(glm::vec3& position, glm::vec3 movement)
+{
+    
 }

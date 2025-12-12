@@ -29,7 +29,7 @@ void main()
     d = clamp(d, 0.0, 9000.0);
 
     // smooth falloff (0 at outer edge, 1 at sphere edge)
-    float falloff = exp(-time * 0.1 * d * d);   // tweak 3.0 sharper/softer
+    float falloff = exp(-0.05 * d * d);   // tweak 3.0 sharper/softer
 
     vec3 glow = color * glowStrength * falloff;
 

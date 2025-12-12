@@ -11,8 +11,8 @@
 #include "Sphere.h"
 
 // Variables
-unsigned int SCR_WIDTH = 1280;
-unsigned int SCR_HEIGHT = 720;
+unsigned int SCR_WIDTH = 800;
+unsigned int SCR_HEIGHT = 600;
 
 // GLFW Functions
 void processInput(GLFWwindow* window); // Function to process input
@@ -172,7 +172,7 @@ int main()
         cameraRight = glm::normalize(cameraRight);
 
         glm::vec4 clipEdge = projection * view *
-            glm::vec4(sphereCenter + cameraRight * sphereRadius, 1.0f);
+        glm::vec4(sphereCenter + cameraRight * sphereRadius, 1.0f);
         glm::vec3 ndcEdge = glm::vec3(clipEdge) / clipEdge.w;
 
         glm::vec2 edgeScreen;
@@ -210,7 +210,7 @@ int main()
 
             glowScreenShader.use();
             glowScreenShader.setVec3("color", glm::vec3(1.0f));       // white glow
-            glowScreenShader.setFloat("glowStrength", 3.0f);          // intensity
+            glowScreenShader.setFloat("glowStrength", sin(time * 3.5)/4 + 2);          // intensity
             glowScreenShader.setVec2("centerScreen", centerScreen);   // uniforms already computed
             glowScreenShader.setFloat("sphereRadiusPx", sphereRadiusPx);
             glowScreenShader.setFloat("glowWidthPx", glowWidthPx);

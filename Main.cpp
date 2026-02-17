@@ -8,6 +8,9 @@
 #include "Shader.h"
 #include "Camera.h"
 #include "Sphere.h"
+#include "TextRenderer.h"
+
+
 
 // Variables
 unsigned int SCR_WIDTH = 1280;
@@ -17,9 +20,10 @@ unsigned int SCR_HEIGHT = 720;
 void processInput(GLFWwindow* window); // Function to process input
 void framebuffer_size_callback(GLFWwindow* window, int width, int height); // Resize
 void mouse_callback(GLFWwindow* window, double xPosIn, double yPosIn); // Mouse
+void gravity(glm::vec3 &pos1, glm::vec3 &pos2, glm::vec3& velocity1, glm::vec3& velocity2, float m1, float m2, float rate = 0.01f);
 
 // Camera
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Camera camera(glm::vec3(0.0f, 0.0f, 100.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -28,6 +32,8 @@ bool firstClick = true;
 // Time Management
 float deltaTime = 0.0f; // time between current frame and last frame
 float lastFrame = 0.0f;
+
+TextRenderer* gTextRenderer = nullptr;
 
 int main()
 {
@@ -64,12 +70,10 @@ int main()
     }
 
     double previousTime = glfwGetTime();
-    int frameCount = 0;
 
     // --- Shaders ---
     Shader defaultShader("default.vert", "default.frag");
     // We keep bloomShader if you still need mesh-based glow elsewhere, but we won't use it in this screen-space path.
-    Shader bloomShader("bloom.vert", "bloom.frag");
     Shader glowScreenShader("glow_screen.vert", "bloom.frag"); // NEW: screen-space glow pipeline
 
     // --- Geometry ---
@@ -78,6 +82,10 @@ int main()
     glBindVertexArray(VAO);
 
     Sphere star(1.0f);
+    Sphere major_star(2.5f);
+
+    TextRenderer text(SCR_WIDTH, SCR_HEIGHT);
+    gTextRenderer = &text;
 
     // Transform uniform location (if used by default shader)
     unsigned int transformLoc = glGetUniformLocation(defaultShader.ID, "transform");
@@ -114,24 +122,41 @@ int main()
     float time;
     float distance;
 
-    glm::vec3 position[5];
+    glm::vec3 position[100];
     glm::vec3 velocity[std::size(position)];
+
+    for (int i = 0; i < std::size(position); i++)
+    {
+        distance = star.getRadius() * 8;
+        
+        position[i] = glm::vec3(sin(i), cos(i), 0) * distance;
+    }
+
+    // FPS tracking
+    int frameCount = 0;
+    int fpsValue = 0;
+    float fpsTimer = 0.0f;
 
     // ----- Main Loop -----
     while (!glfwWindowShouldClose(window))
     {
         time = glfwGetTime();
         float currentFrame = static_cast<float>(time);
+
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
+        // FPS Logic
         frameCount++;
-        if (currentFrame - previousTime >= 1.0)
+        fpsTimer += deltaTime;
+
+        if (fpsTimer >= 1.0f)
         {
-            std::cout << "FPS: " << frameCount << std::endl;
-            std::cout << "Time: " << time << std::endl;
+            fpsValue = frameCount;
             frameCount = 0;
-            previousTime = currentFrame;
+            fpsTimer = 0.0f;
+
+            std::cout << "FPS: " << fpsValue << std::endl;
         }
 
         processInput(window);
@@ -154,15 +179,24 @@ int main()
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view[0][0]);
         glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
-
-
         // ---- STEP 1: Compute sphere center + radius in screen space ----
         for (unsigned int i = 0; i < std::size(position); i++)
         {
-            distance = i * star.getRadius() * 8;
-            position[i] = glm::vec3(distance * sin(time * i * 0.25), distance * cos(time * i*0.25), 0.0f);
             glm::vec3 sphereCenter = glm::vec3(position[i]);
+
             float sphereRadius = star.getRadius(); // 1.0f
+
+
+            if (i == 0)
+            {
+                sphereRadius = major_star.getRadius(); // 1.0f
+            }
+
+
+            gravity(position[0], position[1],
+                velocity[0], velocity[1],
+                1.0e10f, 1.0e10f, 0.01f);
+
 
             // Project center to clip/NDC
             glm::vec4 clipCenter = projection * view * glm::vec4(sphereCenter, 1.0f);
@@ -178,7 +212,7 @@ int main()
             cameraRight = glm::normalize(cameraRight);
 
             glm::vec4 clipEdge = projection * view *
-                glm::vec4(sphereCenter + cameraRight * sphereRadius, 1.0f);
+            glm::vec4(sphereCenter + cameraRight * sphereRadius, 1.0f);
             glm::vec3 ndcEdge = glm::vec3(clipEdge) / clipEdge.w;
 
             glm::vec2 edgeScreen;
@@ -206,8 +240,17 @@ int main()
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE);       // additive blend
 
                 glowScreenShader.use();
-                glowScreenShader.setVec3("color", glm::vec3(1.0f));       // white glow
-                glowScreenShader.setFloat("glowStrength", sin(time * 3.5) / 4 + 2);          // intensity
+
+                if (i == 0)
+                {
+                    glowScreenShader.setVec3("color", glm::vec3(1, 1, 0.5));       // white glow
+                }
+                else
+                {
+                    glowScreenShader.setVec3("color", glm::vec3(1.0));       // white glow
+                }
+                
+                glowScreenShader.setFloat("glowStrength", sin(time * 4.5) / 4 + 2);          // intensity
                 glowScreenShader.setVec2("centerScreen", centerScreen);   // uniforms already computed
                 glowScreenShader.setFloat("sphereRadiusPx", sphereRadiusPx);
                 glowScreenShader.setFloat("glowWidthPx", glowWidthPx);
@@ -224,6 +267,8 @@ int main()
             }
         }
 
+        text.draw("FPS: " + std::to_string(fpsValue), 10, 10, 3.0);
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
@@ -235,7 +280,6 @@ int main()
     glDeleteBuffers(1, &fsVBO);
 
     glDeleteShader(defaultShader.ID);
-    glDeleteShader(bloomShader.ID);
     glDeleteShader(glowScreenShader.ID);
 
     glfwTerminate();
@@ -285,6 +329,10 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     // If you want perfect pixel mapping for the glow when resizing, also update SCR_WIDTH/HEIGHT
     SCR_WIDTH = width;
     SCR_HEIGHT = height;
+
+    if (gTextRenderer)
+        gTextRenderer->resize(width, height);
+
 }
 
 void mouse_callback(GLFWwindow* window, double xPosIn, double yPosIn)
@@ -308,7 +356,27 @@ void mouse_callback(GLFWwindow* window, double xPosIn, double yPosIn)
     camera.ProcessMouseMovement(xOffset, yOffset);
 }
 
-void updatePosition(glm::vec3& position, glm::vec3 movement)
+void gravity(glm::vec3 &pos1, glm::vec3 &pos2, glm::vec3 &velocity1, glm::vec3 &velocity2, float m1, float m2, float rate)
 {
+
+    const float G = 6.67430e-11f; // Gravitational Constant
+
+    float distance = glm::distance(pos2, pos1);
+    if (distance < 0.0001f) return;
+
+    glm::vec3 unit_vector = (pos2 - pos1) / distance;
     
+    float force = (G * m1 * m2) / (distance * distance);
+
+    glm::vec3 direction = glm::normalize(pos2 - pos1);
+
+    glm::vec3 accel1 = (force / m1) * direction;
+    glm::vec3 accel2 = (force / m2) * -direction;
+
+    velocity1 += accel1 * rate;
+    velocity2 += accel2 * rate;
+
+    pos1 += velocity1 * rate;
+    pos2 += velocity2 * rate;
+
 }

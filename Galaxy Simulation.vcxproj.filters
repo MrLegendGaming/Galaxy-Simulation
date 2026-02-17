@@ -32,6 +32,12 @@
     <ClInclude Include="Sphere.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="stb_easy_font.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TextRenderer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="default.vert">
@@ -43,10 +49,13 @@
     <None Include="bloom.frag">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="bloom.vert">
+    <None Include="glow_screen.vert">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="glow_screen.vert">
+    <None Include="text.vert">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="text.frag">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>
